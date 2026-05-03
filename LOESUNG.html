@@ -47,10 +47,8 @@
     width: 500px;
   }
 
-  /* ── TOUCH CONTROLS (mobile only) ── */
-  #touch-controls {
-    display: none;
-  }
+  /* ── TOUCH GESTURE AREA (mobile only) ── */
+  #touch-controls { display: none; }
 
   @media (max-width: 540px) {
     body {
@@ -59,31 +57,12 @@
       overflow-y: auto;
       overflow-x: hidden;
     }
-
-    #screen {
-      width: 100vw;
-      padding: 0 6px;
-    }
-
+    #screen { width: 100vw; padding: 0 6px; }
     #header .logo { font-size: 20px; letter-spacing: 4px; }
     #header .subtitle { font-size: 7px; letter-spacing: 1px; }
-
-    #main {
-      gap: 8px;
-    }
-
-    /* Scale canvas to fit */
-    canvas#board {
-      width: 180px !important;
-      height: 360px !important;
-    }
-
-    #side {
-      gap: 8px;
-      min-width: 0;
-      flex: 1;
-    }
-
+    #main { gap: 8px; }
+    canvas#board { width: 180px !important; height: 360px !important; }
+    #side { gap: 8px; min-width: 0; flex: 1; }
     .panel { padding: 7px; }
     .panel-title { font-size: 7px; margin-bottom: 5px; }
     #score-val { font-size: 16px; }
@@ -91,59 +70,82 @@
     #timer-val { font-size: 20px; }
     #timer-label { font-size: 7px; }
     #quota-text { font-size: 9px; }
-
-    canvas#next-canvas {
-      width: 80px !important;
-      height: 64px !important;
-    }
-
+    canvas#next-canvas { width: 80px !important; height: 64px !important; }
     #log-panel { margin-top: 8px; padding: 7px; }
     #log-lines { font-size: 9px; min-height: 40px; }
-
-    /* Hide keyboard hint, show touch controls */
     #controls { display: none; }
-    #touch-controls { display: flex; }
+    #touch-controls { display: block; }
+
+    /* Gesture hint text */
+    #gesture-hint {
+      display: block !important;
+    }
+
+    /* S/Q resistance hint on mobile */
+    #resistance-hint { font-size: 8px; }
+
+    /* Inquiry touch button on mobile */
+    #btn-inquiry-touch {
+      position: fixed;
+      bottom: 20px;
+      right: 12px;
+      z-index: 150;
+    }
+    /* Resistance touch buttons */
+    #resistance-touch-row {
+      position: fixed;
+      bottom: 20px;
+      left: 12px;
+      gap: 8px;
+      z-index: 150;
+    }
   }
 
-  /* Touch button layout */
+  /* Gesture overlay — invisible touch target over canvas */
   #touch-controls {
-    flex-direction: column;
-    gap: 6px;
-    margin-top: 10px;
-    padding: 0 6px 16px;
     width: 100%;
+    margin-top: 6px;
   }
 
-  .touch-row {
-    display: flex;
-    gap: 6px;
-    justify-content: center;
+  /* Gesture hint */
+  #gesture-hint {
+    display: none;
+    text-align: center;
+    font-size: 8px;
+    color: #333;
+    letter-spacing: 1px;
+    margin-top: 4px;
+    padding-bottom: 8px;
   }
 
-  .touch-btn {
+  /* Floating inquiry button for mobile */
+  #btn-inquiry-touch {
+    display: none;
     background: var(--mid);
-    border: 1px solid var(--grey);
-    color: var(--paper);
+    border: 1px solid var(--accent);
+    color: var(--accent);
     font-family: 'Share Tech Mono', monospace;
-    font-size: 16px;
-    padding: 0;
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 6px 10px;
     cursor: pointer;
-    border-radius: 3px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    user-select: none;
-    -webkit-user-select: none;
-    touch-action: manipulation;
-    transition: background 0.1s;
-    /* prevent double-tap zoom */
+    animation: inquiry-pulse 1.5s ease-in-out infinite;
   }
-  .touch-btn:active { background: var(--grey); }
 
-  .touch-btn.wide   { width: 80px;  height: 52px; }
-  .touch-btn.normal { width: 64px;  height: 52px; }
-  .touch-btn.tall   { width: 64px;  height: 52px; }
-  .touch-btn.hard   { width: 136px; height: 44px; font-size: 12px; letter-spacing: 2px; }
+  /* Floating resistance buttons for mobile */
+  #resistance-touch-row {
+    display: none;
+    gap: 8px;
+  }
+  .res-touch-btn {
+    background: var(--mid);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 9px;
+    letter-spacing: 1px;
+    padding: 6px 10px;
+    cursor: pointer;
+    border-radius: 2px;
+  }
 
   /* ── HEADER ── */
   #header {
@@ -493,29 +495,22 @@
 
   <div id="resistance-hint">[ S ] SLOW OUTPUT &nbsp;·&nbsp; [ Q ] STOP PRODUCTION</div>
 
-  <!-- TOUCH CONTROLS (mobile) -->
+  <!-- TOUCH CONTROLS (mobile) — gesture-based -->
   <div id="touch-controls">
-    <div class="touch-row">
-      <button class="touch-btn normal" id="btn-rotate">↺</button>
-      <button class="touch-btn normal" id="btn-inquiry-touch" onclick="triggerInquiry()"
-        style="font-size:8px; letter-spacing:0; width:120px; display:none; border-color:var(--accent); color:var(--accent);">
-        INQUIRY −50
-      </button>
+    <div id="gesture-hint">
+      ← → SWIPE &nbsp;|&nbsp; ↓ SWIPE DOWN &nbsp;|&nbsp; ↑ SWIPE UP = DROP &nbsp;|&nbsp; TAP = ROTATE
     </div>
-    <div class="touch-row">
-      <button class="touch-btn normal" id="btn-left">←</button>
-      <button class="touch-btn tall"   id="btn-down">↓</button>
-      <button class="touch-btn normal" id="btn-right">→</button>
-    </div>
-    <div class="touch-row">
-      <button class="touch-btn hard"   id="btn-hard">▼▼ HARD DROP</button>
-    </div>
-    <div class="touch-row" id="resistance-touch-row" style="display:none; gap:6px;">
-      <button class="touch-btn" style="width:100px; height:40px; font-size:9px; letter-spacing:1px; border-color:var(--accent); color:var(--accent);"
-        onclick="setOutputMode('slow')">SLOW ▸ S</button>
-      <button class="touch-btn" style="width:100px; height:40px; font-size:9px; letter-spacing:1px; border-color:var(--red); color:var(--red);"
-        onclick="setOutputMode('stop')">STOP ▸ Q</button>
-    </div>
+  </div>
+
+  <!-- Floating inquiry button (mobile only) -->
+  <button id="btn-inquiry-touch" onclick="triggerInquiry()">INQUIRY −50</button>
+
+  <!-- Floating resistance buttons (mobile only) -->
+  <div id="resistance-touch-row">
+    <button class="res-touch-btn" style="border:1px solid var(--accent); color:var(--accent);"
+      onclick="setOutputMode('slow')">[ S ] SLOW</button>
+    <button class="res-touch-btn" style="border:1px solid var(--red); color:var(--red);"
+      onclick="setOutputMode('stop')">[ Q ] STOP</button>
   </div>
 </div>
 
@@ -1169,55 +1164,127 @@ document.addEventListener('keyup', e => {
 });
 
 // ══════════════════════════════════════════════
-//  TOUCH CONTROLS
+//  TOUCH GESTURES (mobile)
 // ══════════════════════════════════════════════
-function bindTouch(id, onStart, onEnd) {
-  const el = document.getElementById(id);
+(function setupGestures() {
+  const SWIPE_MIN   = 20;   // px minimum to count as a swipe
+  const LONG_PRESS  = 500;  // ms for soft drop
+  const HARD_PRESS  = 1000; // ms for hard drop
+  const TAP_MAX     = 10;   // px max movement to count as tap
+
+  let touchStartX = 0, touchStartY = 0;
+  let touchStartTime = 0;
+  let longPressTimer = null;
+  let hardPressTimer = null;
+  let gestureHandled = false;
+  let isSoftDropping = false;
+
+  // Attach to the whole screen div so the entire game area is responsive
+  const el = document.getElementById('screen');
   if (!el) return;
+
   el.addEventListener('touchstart', e => {
+    // Don't intercept taps on overlay buttons
+    if (e.target.tagName === 'BUTTON') return;
     e.preventDefault();
-    if (!running) return;
-    onStart();
+    const t = e.touches[0];
+    touchStartX    = t.clientX;
+    touchStartY    = t.clientY;
+    touchStartTime = Date.now();
+    gestureHandled = false;
+    isSoftDropping = false;
+
+    // Long press → soft drop
+    longPressTimer = setTimeout(() => {
+      if (!gestureHandled && running && outputMode !== 'stop') {
+        gestureHandled = true;
+        isSoftDropping = true;
+        softDropping   = true;
+        softStep();
+        softDropTimer  = setInterval(softStep, SOFT_DROP_INTERVAL);
+      }
+    }, LONG_PRESS);
+
+    // Even longer → hard drop
+    hardPressTimer = setTimeout(() => {
+      if (isSoftDropping) {
+        // upgrade soft drop to hard drop
+        clearInterval(softDropTimer);
+        softDropping   = false;
+        isSoftDropping = false;
+        if (running && outputMode !== 'stop') {
+          hardDrop(); draw();
+        }
+      }
+    }, HARD_PRESS);
+
   }, { passive: false });
-  if (onEnd) {
-    el.addEventListener('touchend', e => {
-      e.preventDefault();
-      onEnd();
-    }, { passive: false });
-  }
-  // Also support mouse for testing on desktop
-  el.addEventListener('mousedown', e => { if (!running) return; onStart(); });
-  if (onEnd) el.addEventListener('mouseup', onEnd);
-}
 
-bindTouch('btn-left',
-  () => { current.x--; if (collides()) current.x++; else sfxMove(); draw(); }
-);
-bindTouch('btn-right',
-  () => { current.x++; if (collides()) current.x--; else sfxMove(); draw(); }
-);
-bindTouch('btn-rotate',
-  () => { rotate(); draw(); }
-);
-bindTouch('btn-hard',
-  () => { hardDrop(); draw(); }
-);
+  el.addEventListener('touchmove', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    if (gestureHandled) return;
 
-// Soft drop: press and hold
-bindTouch('btn-down',
-  () => {
-    if (!softDropping) {
-      softDropping = true;
-      softStep();
-      softDropTimer = setInterval(softStep, SOFT_DROP_INTERVAL);
+    const t  = e.touches[0];
+    const dx = t.clientX - touchStartX;
+    const dy = t.clientY - touchStartY;
+
+    if (Math.abs(dx) < SWIPE_MIN && Math.abs(dy) < SWIPE_MIN) return;
+
+    // Cancel long-press timers — this is a swipe
+    clearTimeout(longPressTimer);
+    clearTimeout(hardPressTimer);
+    gestureHandled = true;
+
+    if (!running || outputMode === 'stop') return;
+
+    if (Math.abs(dx) > Math.abs(dy)) {
+      // Horizontal swipe → move
+      if (dx > 0) {
+        current.x++; if (collides()) current.x--; else sfxMove();
+      } else {
+        current.x--; if (collides()) current.x++; else sfxMove();
+      }
+      draw();
+    } else {
+      if (dy < 0) {
+        // Swipe up → hard drop
+        hardDrop(); draw();
+      } else {
+        // Swipe down → soft drop one step
+        sfxSoftDrop();
+        if (!moveDown()) { lock(); clearLines(); spawnNext(); }
+        draw();
+      }
     }
-  },
-  () => {
-    softDropping = false;
-    clearInterval(softDropTimer);
-    softDropTimer = null;
-  }
-);
+  }, { passive: false });
+
+  el.addEventListener('touchend', e => {
+    if (e.target.tagName === 'BUTTON') return;
+    e.preventDefault();
+    clearTimeout(longPressTimer);
+    clearTimeout(hardPressTimer);
+
+    // Stop soft drop if it was running
+    if (isSoftDropping) {
+      softDropping = false;
+      clearInterval(softDropTimer);
+      softDropTimer  = null;
+      isSoftDropping = false;
+      return;
+    }
+
+    if (gestureHandled) return;
+
+    // Tap = rotate
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = e.changedTouches[0].clientY - touchStartY;
+    const moved = Math.sqrt(dx*dx + dy*dy);
+    if (moved < TAP_MAX && running && outputMode !== 'stop') {
+      rotate(); draw();
+    }
+  }, { passive: false });
+})();
 
 function softStep() {
   if (!running) { clearInterval(softDropTimer); return; }
