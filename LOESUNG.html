@@ -81,23 +81,24 @@
       display: block !important;
     }
 
-    /* S/Q resistance hint on mobile */
+    /* S/Q resistance hint on mobile — stays inside panel, no change needed */
     #resistance-hint { font-size: 8px; }
 
-    /* Inquiry touch button on mobile */
+    /* Inquiry touch button on mobile — fixed bottom right */
     #btn-inquiry-touch {
       position: fixed;
       bottom: 20px;
       right: 12px;
       z-index: 150;
     }
-    /* Resistance touch buttons */
+
+    /* Resistance touch buttons on mobile — NOT fixed, sits below OUTPUT METRICS */
     #resistance-touch-row {
-      position: fixed;
-      bottom: 20px;
-      left: 12px;
-      gap: 8px;
-      z-index: 150;
+      position: static;
+      display: none;
+      gap: 6px;
+      margin-top: 6px;
+      flex-wrap: wrap;
     }
   }
 
@@ -132,10 +133,12 @@
     animation: inquiry-pulse 1.5s ease-in-out infinite;
   }
 
-  /* Floating resistance buttons for mobile */
+  /* Floating resistance buttons for mobile — hidden by default */
   #resistance-touch-row {
     display: none;
-    gap: 8px;
+    gap: 6px;
+    margin-top: 6px;
+    flex-wrap: wrap;
   }
   .res-touch-btn {
     background: var(--mid);
@@ -363,30 +366,17 @@
     font-family: 'Special Elite', cursive;
   }
 
-  /* ── OUTPUT MODE INDICATOR ── */
-  #output-mode {
-    display: none;
-    font-size: 9px;
-    letter-spacing: 2px;
-    margin-top: 5px;
-    padding: 3px 6px;
-    border: 1px solid;
-  }
-  #output-mode.slow    { display: block; color: var(--accent); border-color: var(--accent); }
-  #output-mode.stopped { display: block; color: var(--red);    border-color: var(--red); }
-
-  /* ── METRICS ACTION AREA — fixed height, no layout shift ── */
+  /* ── METRICS ACTION AREA ── */
   #metrics-action-area {
-    height: 28px;
-    margin-top: 6px;
-    position: relative;
-    display: flex;
-    align-items: center;
+    margin-top: 4px;
   }
 
-  /* ── INQUIRY BUTTON — inside panel, no layout shift ── */
+  /* ── INQUIRY BUTTON — bottom-right of dispatch log ── */
   #inquiry-btn {
     display: none;
+    position: absolute;
+    bottom: 8px;
+    right: 8px;
     background: none;
     border: 1px solid var(--accent);
     color: var(--accent);
@@ -396,7 +386,6 @@
     padding: 4px 8px;
     cursor: pointer;
     animation: inquiry-pulse 1.5s ease-in-out infinite;
-    width: 100%;
   }
   #inquiry-btn.visible { display: block; }
   @keyframes inquiry-pulse {
@@ -465,9 +454,14 @@
         <div class="panel-title">OUTPUT METRICS</div>
         <div id="score-val">0</div>
         <div id="level-val">PHASE I</div>
-        <div id="output-mode"></div>
         <div id="metrics-action-area">
-          <button id="inquiry-btn" onclick="triggerInquiry()">[ INQUIRY — −50 PTS ]</button>
+          <!-- Mobile S/Q buttons — hidden on desktop, shown on mobile after inquiry -->
+          <div id="resistance-touch-row">
+            <button class="res-touch-btn" style="border:1px solid var(--accent); color:var(--accent);"
+              onclick="setOutputMode('slow')"><span id="hint-s-touch">[ S ] SLOW</span></button>
+            <button class="res-touch-btn" style="border:1px solid var(--red); color:var(--red);"
+              onclick="setOutputMode('stop')"><span id="hint-q-touch">[ Q ] STOP</span></button>
+          </div>
         </div>
       </div>
 
@@ -484,16 +478,17 @@
     </div>
   </div>
 
-  <div id="log-panel">
+  <div id="log-panel" style="position:relative;">
     <div id="log-title">DISPATCH LOG</div>
     <div id="log-lines"></div>
+    <button id="inquiry-btn" onclick="triggerInquiry()">[ INQUIRY — −50 PTS ]</button>
   </div>
 
   <div id="controls">
     ← → MOVE &nbsp;|&nbsp; ↑ ROTATE &nbsp;|&nbsp; ↓ SOFT DROP &nbsp;|&nbsp; SPACE HARD DROP
   </div>
 
-  <div id="resistance-hint">[ S ] SLOW OUTPUT &nbsp;·&nbsp; [ Q ] STOP PRODUCTION</div>
+  <div id="resistance-hint"><span id="hint-s">[ S ] SLOW OUTPUT</span> &nbsp;·&nbsp; <span id="hint-q">[ Q ] STOP PRODUCTION</span></div>
 
   <!-- TOUCH CONTROLS (mobile) — gesture-based -->
   <div id="touch-controls">
@@ -505,13 +500,6 @@
   <!-- Floating inquiry button (mobile only) -->
   <button id="btn-inquiry-touch" onclick="triggerInquiry()">INQUIRY −50</button>
 
-  <!-- Floating resistance buttons (mobile only) -->
-  <div id="resistance-touch-row">
-    <button class="res-touch-btn" style="border:1px solid var(--accent); color:var(--accent);"
-      onclick="setOutputMode('slow')">[ S ] SLOW</button>
-    <button class="res-touch-btn" style="border:1px solid var(--red); color:var(--red);"
-      onclick="setOutputMode('stop')">[ Q ] STOP</button>
-  </div>
 </div>
 
 <!-- START OVERLAY -->
@@ -807,11 +795,17 @@ function startGame() {
   next           = randomPiece();
   // Reset inquiry UI
   document.getElementById('inquiry-btn').classList.remove('visible');
+  document.getElementById('hint-s').textContent = '[ S ] SLOW OUTPUT';
+  document.getElementById('hint-s').style.display = '';
+  document.getElementById('hint-q').textContent = '[ Q ] STOP PRODUCTION';
+  document.getElementById('hint-q').style.display = '';
+  const hst = document.getElementById('hint-s-touch');
+  const hqt = document.getElementById('hint-q-touch');
+  if (hst) { hst.textContent = '[ S ] SLOW OUTPUT'; hst.closest('button').style.display = ''; }
+  if (hqt) { hqt.textContent = '[ Q ] STOP PRODUCTION'; hqt.closest('button').style.display = ''; }
   document.getElementById('resistance-hint').classList.remove('visible');
-  document.getElementById('output-mode').className = '';
-  document.getElementById('output-mode').textContent = '';
   const ti = document.getElementById('btn-inquiry-touch');
-  if (ti) ti.style.display = 'none';
+  if (ti && window.innerWidth <= 540) ti.style.display = 'none';
   const rr = document.getElementById('resistance-touch-row');
   if (rr) rr.style.display = 'none';
   updateUI();
@@ -828,9 +822,7 @@ function triggerInquiry() {
   inquiryAvail = false;
   document.getElementById('inquiry-btn').classList.remove('visible');
   const ti = document.getElementById('btn-inquiry-touch');
-  if (ti) ti.style.display = 'none';
-
-  score = Math.max(0, score - INQUIRY_COST);
+  if (ti && window.innerWidth <= 540) ti.style.display = 'none';
   updateQuota();
 
   const msg = INQUIRY_REVEALS[inquiryCount] || INQUIRY_REVEALS[INQUIRY_REVEALS.length-1];
@@ -839,38 +831,38 @@ function triggerInquiry() {
 
   // After first inquiry, reveal resistance options
   if (inquiryCount === 1) {
-    // Hide inquiry btn, show resistance hint in same slot
     document.getElementById('inquiry-btn').classList.remove('visible');
     document.getElementById('resistance-hint').classList.add('visible');
-    const rr = document.getElementById('resistance-touch-row');
-    if (rr) rr.style.display = 'flex';
+    // Show S/Q touch buttons on mobile only
+    if (window.innerWidth <= 540) {
+      const rr = document.getElementById('resistance-touch-row');
+      if (rr) rr.style.display = 'flex';
+    }
   }
   playTone(180, 'triangle', 0.3, 0.12, 0);
   playTone(160, 'triangle', 0.3, 0.10, 0.2);
 }
 
 function setOutputMode(mode) {
-  if (mode === outputMode) return;
   outputMode = mode;
-  const el = document.getElementById('output-mode');
 
   if (mode === 'slow') {
     clearInterval(gameLoop);
     clearInterval(slowDropTimer);
     gameLoop = null;
     slowDropTimer = setInterval(tick, SLOW_SPEED);
-    el.className = 'slow';
-    el.textContent = '▸ SLOWING OUTPUT';
+    document.getElementById('hint-s').textContent = '▸ SLOWING OUTPUT';
+    const st = document.getElementById('hint-s-touch');
+    if (st) st.textContent = '▸ SLOWING OUTPUT';
     addLog("Output reduced. Minimum compliance maintained.", true);
   } else if (mode === 'stop') {
     clearInterval(gameLoop);
     clearInterval(slowDropTimer);
     gameLoop = null;
-    // Pieces freeze but clock keeps running
-    el.className = 'stopped';
-    el.textContent = '▸ PRODUCTION HALTED';
+    document.getElementById('hint-q').textContent = '▸ PRODUCTION HALTED';
+    const qt = document.getElementById('hint-q-touch');
+    if (qt) qt.textContent = '▸ PRODUCTION HALTED';
     addLog("Production halted. Awaiting reassignment.", true);
-    // Do NOT set running = false — clock must keep ticking
   }
 }
 
@@ -980,7 +972,7 @@ function clearLines() {
       inquiryAvail = true;
       document.getElementById('inquiry-btn').classList.add('visible');
       const ti = document.getElementById('btn-inquiry-touch');
-      if (ti) ti.style.display = 'block';
+      if (ti && window.innerWidth <= 540) ti.style.display = 'block';
     }
 
     if (totalLines >= REVEAL_THRESHOLD) { triggerReveal(); return; }
