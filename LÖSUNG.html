@@ -1,0 +1,1328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SOLUTION — Werk GmbH Production System v2.4</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Special+Elite&family=Share+Tech+Mono&family=UnifrakturMaguntia&display=swap');
+
+  :root {
+    --bg: #0d0d0b;
+    --paper: #e8e0cc;
+    --ink: #1a1a14;
+    --red: #8b1a1a;
+    --grey: #4a4a40;
+    --mid: #2a2a22;
+    --accent: #c8a84b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--paper);
+    font-family: 'Share Tech Mono', monospace;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.08) 2px, rgba(0,0,0,0.08) 4px);
+    pointer-events: none;
+    z-index: 100;
+  }
+
+  /* ── RESPONSIVE ── */
+  #screen {
+    position: relative;
+    width: 500px;
+  }
+
+  /* ── TOUCH CONTROLS (mobile only) ── */
+  #touch-controls {
+    display: none;
+  }
+
+  @media (max-width: 540px) {
+    body {
+      justify-content: flex-start;
+      padding: 8px 0 0;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    #screen {
+      width: 100vw;
+      padding: 0 6px;
+    }
+
+    #header .logo { font-size: 20px; letter-spacing: 4px; }
+    #header .subtitle { font-size: 7px; letter-spacing: 1px; }
+
+    #main {
+      gap: 8px;
+    }
+
+    /* Scale canvas to fit */
+    canvas#board {
+      width: 180px !important;
+      height: 360px !important;
+    }
+
+    #side {
+      gap: 8px;
+      min-width: 0;
+      flex: 1;
+    }
+
+    .panel { padding: 7px; }
+    .panel-title { font-size: 7px; margin-bottom: 5px; }
+    #score-val { font-size: 16px; }
+    #level-val { font-size: 10px; }
+    #timer-val { font-size: 20px; }
+    #timer-label { font-size: 7px; }
+    #quota-text { font-size: 9px; }
+
+    canvas#next-canvas {
+      width: 80px !important;
+      height: 64px !important;
+    }
+
+    #log-panel { margin-top: 8px; padding: 7px; }
+    #log-lines { font-size: 9px; min-height: 40px; }
+
+    /* Hide keyboard hint, show touch controls */
+    #controls { display: none; }
+    #touch-controls { display: flex; }
+  }
+
+  /* Touch button layout */
+  #touch-controls {
+    flex-direction: column;
+    gap: 6px;
+    margin-top: 10px;
+    padding: 0 6px 16px;
+    width: 100%;
+  }
+
+  .touch-row {
+    display: flex;
+    gap: 6px;
+    justify-content: center;
+  }
+
+  .touch-btn {
+    background: var(--mid);
+    border: 1px solid var(--grey);
+    color: var(--paper);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 16px;
+    padding: 0;
+    cursor: pointer;
+    border-radius: 3px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    user-select: none;
+    -webkit-user-select: none;
+    touch-action: manipulation;
+    transition: background 0.1s;
+    /* prevent double-tap zoom */
+  }
+  .touch-btn:active { background: var(--grey); }
+
+  .touch-btn.wide   { width: 80px;  height: 52px; }
+  .touch-btn.normal { width: 64px;  height: 52px; }
+  .touch-btn.tall   { width: 64px;  height: 52px; }
+  .touch-btn.hard   { width: 136px; height: 44px; font-size: 12px; letter-spacing: 2px; }
+
+  /* ── HEADER ── */
+  #header {
+    text-align: center;
+    margin-bottom: 16px;
+    border-bottom: 1px solid var(--grey);
+    padding-bottom: 10px;
+  }
+  #header .logo {
+    font-family: 'Special Elite', cursive;
+    font-size: 28px;
+    letter-spacing: 8px;
+    color: var(--paper);
+    text-shadow: 0 0 20px rgba(200,168,75,0.3);
+  }
+  #header .subtitle {
+    font-size: 10px;
+    color: var(--grey);
+    letter-spacing: 3px;
+    margin-top: 4px;
+  }
+
+  /* ── MAIN LAYOUT ── */
+  #main {
+    display: flex;
+    gap: 16px;
+    align-items: flex-start;
+  }
+
+  /* ── GAME BOARD ── */
+  #board-wrap {
+    flex-shrink: 0;
+  }
+  #board-label {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--grey);
+    margin-bottom: 4px;
+  }
+  canvas#board {
+    display: block;
+    border: 1px solid var(--grey);
+    background: #111110;
+    image-rendering: pixelated;
+  }
+
+  /* ── SIDE PANEL ── */
+  #side {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+    min-width: 140px;
+  }
+
+  .panel {
+    border: 1px solid var(--grey);
+    padding: 10px;
+    background: var(--mid);
+  }
+  .panel-title {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 8px;
+    border-bottom: 1px solid #333;
+    padding-bottom: 4px;
+  }
+
+  #quota-bar-wrap { margin-top: 4px; }
+  #quota-bar-bg {
+    background: #111;
+    height: 10px;
+    width: 100%;
+    border: 1px solid #333;
+  }
+  #quota-bar {
+    background: var(--accent);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s;
+  }
+  #quota-text { font-size: 11px; margin-top: 4px; color: var(--paper); }
+
+  #score-val { font-size: 22px; color: var(--paper); }
+  #level-val { font-size: 13px; color: var(--grey); margin-top: 4px; }
+
+  canvas#next-canvas {
+    display: block;
+    background: #111;
+    margin-top: 4px;
+  }
+
+  /* ── DISPATCH LOG ── */
+  #log-panel {
+    border: 1px solid var(--grey);
+    padding: 10px;
+    background: var(--mid);
+    margin-top: 14px;
+  }
+  #log-title {
+    font-size: 9px;
+    letter-spacing: 2px;
+    color: var(--accent);
+    margin-bottom: 6px;
+  }
+  #log-lines {
+    font-size: 10px;
+    line-height: 1.7;
+    color: #888;
+    min-height: 60px;
+  }
+  #log-lines .new { color: var(--paper); }
+  #log-lines .warn { color: var(--red); }
+
+  /* ── CONTROLS HINT ── */
+  #controls {
+    text-align: center;
+    margin-top: 12px;
+    font-size: 9px;
+    color: #444;
+    letter-spacing: 1px;
+  }
+
+  /* ── OVERLAYS ── */
+  .overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    align-items: center;
+    justify-content: center;
+  }
+  .overlay.active { display: flex; }
+
+  .overlay-box {
+    background: var(--bg);
+    border: 2px solid var(--grey);
+    padding: 40px;
+    max-width: 420px;
+    text-align: center;
+  }
+  .overlay-box h2 {
+    font-family: 'Special Elite', cursive;
+    font-size: 22px;
+    letter-spacing: 4px;
+    margin-bottom: 16px;
+    color: var(--paper);
+  }
+  .overlay-box p {
+    font-size: 12px;
+    line-height: 1.9;
+    color: #aaa;
+    margin-bottom: 20px;
+  }
+  .overlay-box p.highlight {
+    color: var(--red);
+    font-size: 13px;
+    border: 1px solid var(--red);
+    padding: 12px;
+    margin-bottom: 20px;
+  }
+  .overlay-box button {
+    background: none;
+    border: 1px solid var(--paper);
+    color: var(--paper);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 3px;
+    padding: 10px 24px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .overlay-box button:hover {
+    background: var(--paper);
+    color: var(--bg);
+  }
+
+  /* Reveal overlay special */
+  #reveal-overlay .overlay-box {
+    border-color: var(--red);
+    animation: flicker 0.5s ease-in-out;
+  }
+  @keyframes flicker {
+    0%,100% { opacity: 1; }
+    25% { opacity: 0.3; }
+    50% { opacity: 0.8; }
+    75% { opacity: 0.2; }
+  }
+  #reveal-overlay h2 { color: var(--red); letter-spacing: 6px; }
+
+  /* GAME OVER */
+  #gameover-overlay h2 { color: var(--grey); }
+
+  /* ── NAZI ENDING ── */
+  #nazi-overlay .overlay-box {
+    border-color: var(--red);
+    background: #0a0000;
+  }
+  #nazi-overlay h2 {
+    font-family: 'UnifrakturMaguntia', 'Special Elite', cursive;
+    font-size: 26px;
+    letter-spacing: 2px;
+    color: var(--red);
+    line-height: 1.4;
+    margin-bottom: 20px;
+    text-shadow: 0 0 20px rgba(139,26,26,0.8);
+  }
+  #nazi-overlay p { color: #888; }
+  #nazi-overlay .score-line {
+    font-size: 28px;
+    color: var(--accent);
+    letter-spacing: 4px;
+    margin: 16px 0;
+    font-family: 'Special Elite', cursive;
+  }
+
+  /* ── OUTPUT MODE INDICATOR ── */
+  #output-mode {
+    display: none;
+    font-size: 9px;
+    letter-spacing: 2px;
+    margin-top: 5px;
+    padding: 3px 6px;
+    border: 1px solid;
+  }
+  #output-mode.slow    { display: block; color: var(--accent); border-color: var(--accent); }
+  #output-mode.stopped { display: block; color: var(--red);    border-color: var(--red); }
+
+  /* ── METRICS ACTION AREA — fixed height, no layout shift ── */
+  #metrics-action-area {
+    height: 28px;
+    margin-top: 6px;
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  /* ── INQUIRY BUTTON — inside panel, no layout shift ── */
+  #inquiry-btn {
+    display: none;
+    background: none;
+    border: 1px solid var(--accent);
+    color: var(--accent);
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+    padding: 4px 8px;
+    cursor: pointer;
+    animation: inquiry-pulse 1.5s ease-in-out infinite;
+    width: 100%;
+  }
+  #inquiry-btn.visible { display: block; }
+  @keyframes inquiry-pulse {
+    0%,100% { opacity: 1; box-shadow: 0 0 6px rgba(200,168,75,0.4); }
+    50%      { opacity: 0.55; box-shadow: none; }
+  }
+
+  /* ── RESISTANCE HINT — below controls, same style ── */
+  #resistance-hint {
+    display: none;
+    text-align: center;
+    margin-top: 6px;
+    font-size: 9px;
+    color: var(--grey);
+    letter-spacing: 1px;
+  }
+  #resistance-hint.visible { display: block; }
+
+  /* ── TIMER ── */
+  #timer-val {
+    font-size: 28px;
+    letter-spacing: 3px;
+    color: var(--paper);
+    transition: color 0.4s;
+  }
+  #timer-val.urgent {
+    color: var(--red);
+    animation: pulse-red 1s ease-in-out infinite;
+  }
+  @keyframes pulse-red {
+    0%, 100% { opacity: 1; }
+    50%       { opacity: 0.5; }
+  }
+  #timer-label {
+    font-size: 9px;
+    color: var(--grey);
+    margin-top: 3px;
+    letter-spacing: 2px;
+  }
+</style>
+</head>
+<body>
+
+<div id="screen">
+  <div id="header">
+    <div class="logo">LÖSUNG</div>
+    <div class="subtitle">WERK GMBH — INDUSTRIAL PRODUCTION MANAGEMENT SYSTEM — v2.4</div>
+  </div>
+
+  <div id="main">
+    <div id="board-wrap">
+      <div id="board-label">ASSEMBLY FLOOR — UNIT GRID</div>
+      <canvas id="board" width="200" height="400"></canvas>
+    </div>
+
+    <div id="side">
+      <div class="panel">
+        <div class="panel-title">PRODUCTION QUOTA</div>
+        <div id="quota-bar-wrap">
+          <div id="quota-bar-bg"><div id="quota-bar"></div></div>
+          <div id="quota-text">0 / 20 lines</div>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">OUTPUT METRICS</div>
+        <div id="score-val">0</div>
+        <div id="level-val">PHASE I</div>
+        <div id="output-mode"></div>
+        <div id="metrics-action-area">
+          <button id="inquiry-btn" onclick="triggerInquiry()">[ INQUIRY — −50 PTS ]</button>
+        </div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">DEADLINE</div>
+        <div id="timer-val">5:00</div>
+        <div id="timer-label">TIME REMAINING</div>
+      </div>
+
+      <div class="panel">
+        <div class="panel-title">NEXT COMPONENT</div>
+        <canvas id="next-canvas" width="100" height="80"></canvas>
+      </div>
+    </div>
+  </div>
+
+  <div id="log-panel">
+    <div id="log-title">DISPATCH LOG</div>
+    <div id="log-lines"></div>
+  </div>
+
+  <div id="controls">
+    ← → MOVE &nbsp;|&nbsp; ↑ ROTATE &nbsp;|&nbsp; ↓ SOFT DROP &nbsp;|&nbsp; SPACE HARD DROP
+  </div>
+
+  <div id="resistance-hint">[ S ] SLOW OUTPUT &nbsp;·&nbsp; [ Q ] STOP PRODUCTION</div>
+
+  <!-- TOUCH CONTROLS (mobile) -->
+  <div id="touch-controls">
+    <div class="touch-row">
+      <button class="touch-btn normal" id="btn-rotate">↺</button>
+      <button class="touch-btn normal" id="btn-inquiry-touch" onclick="triggerInquiry()"
+        style="font-size:8px; letter-spacing:0; width:120px; display:none; border-color:var(--accent); color:var(--accent);">
+        INQUIRY −50
+      </button>
+    </div>
+    <div class="touch-row">
+      <button class="touch-btn normal" id="btn-left">←</button>
+      <button class="touch-btn tall"   id="btn-down">↓</button>
+      <button class="touch-btn normal" id="btn-right">→</button>
+    </div>
+    <div class="touch-row">
+      <button class="touch-btn hard"   id="btn-hard">▼▼ HARD DROP</button>
+    </div>
+    <div class="touch-row" id="resistance-touch-row" style="display:none; gap:6px;">
+      <button class="touch-btn" style="width:100px; height:40px; font-size:9px; letter-spacing:1px; border-color:var(--accent); color:var(--accent);"
+        onclick="setOutputMode('slow')">SLOW ▸ S</button>
+      <button class="touch-btn" style="width:100px; height:40px; font-size:9px; letter-spacing:1px; border-color:var(--red); color:var(--red);"
+        onclick="setOutputMode('stop')">STOP ▸ Q</button>
+    </div>
+  </div>
+</div>
+
+<!-- START OVERLAY -->
+<div class="overlay active" id="start-overlay">
+  <div class="overlay-box">
+    <h2>WERK GMBH</h2>
+    <p>Welcome, new Production Coordinator.<br><br>
+    Your task is to optimise component assembly for our client contracts. Fill each row completely to dispatch the batch.<br><br>
+    Meet your quota. Serve the order.</p>
+    <p style="font-size:10px; color:#555;">Werk GmbH is proud to serve industry since 1933.</p>
+    <button onclick="startGame()">BEGIN ASSIGNMENT</button>
+  </div>
+</div>
+
+<!-- REVEAL OVERLAY -->
+<div class="overlay" id="reveal-overlay">
+  <div class="overlay-box">
+    <h2>LÖSUNG</h2>
+    <p class="highlight">You have successfully completed 20 production runs.<br>
+    Congratulations, Coordinator.</p>
+    <p>The components you assembled were parts for the Zyklon B dispersal systems delivered to Auschwitz-Birkenau.<br><br>
+    Werk GmbH was a real category of company. Ordinary people — accountants, engineers, logistics workers — optimised these supply chains. They did not ask what the order was for. They met their quota.</p>
+    <p id="reveal-choice-line" style="font-size:12px; color:var(--red); border:1px solid #4a1a1a; padding:10px; margin-bottom:16px;"></p>
+    <p style="font-size:10px; color:#555; margin-top:8px;">
+    "Solution" is inspired by Brenda Romero's board game <em>Train</em> (2009), and by Sadie Green's game of the same name in Gabrielle Zevin's <em>Tomorrow, and Tomorrow, and Tomorrow</em>.<br><br>
+    The word <em>Lösung</em> means "solution" in German.<br>
+    <em>Die Endlösung</em> — "The Final Solution" — was the Nazi regime's term for the genocide of the Jewish people.
+    </p>
+    <button onclick="restartGame()">RESTART</button>
+  </div>
+</div>
+
+<!-- GAME OVER: TIMEOUT -->
+<div class="overlay" id="timeout-overlay">
+  <div class="overlay-box">
+    <h2>DEADLINE EXCEEDED</h2>
+    <p>The production window has closed.<br>
+    Your quota was not met in time.<br><br>
+    Lines completed: <span id="timeout-lines">0</span> / 20<br>
+    Score: <span id="timeout-score">0</span></p>
+    <p style="font-size:10px;color:#555;">Punctuality is compliance. The order will not wait.</p>
+    <button onclick="restartGame()">REASSIGN</button>
+  </div>
+</div>
+<div class="overlay" id="gameover-overlay">
+  <div class="overlay-box">
+    <h2>QUOTA UNMET</h2>
+    <p>Production has halted. The assembly floor is blocked.<br><br>
+    Score: <span id="final-score">0</span></p>
+    <button onclick="restartGame()">REASSIGN</button>
+  </div>
+</div>
+
+<!-- NAZI ENDING -->
+<div class="overlay" id="nazi-overlay">
+  <div class="overlay-box">
+    <h2>Glückwunsch, Nazi!</h2>
+    <p>You have helped lead the Third Reich to Victory.</p>
+    <div class="score-line" id="nazi-score-val">0</div>
+    <p style="font-size:11px; letter-spacing:3px; color:var(--accent); margin-bottom:16px;">YOU ARE A TRUE MASTER OF EFFICIENCY</p>
+    <p style="font-size:11px; color:#555; margin-bottom:20px;">
+    You never asked what you were building.<br>
+    You never slowed down. You never stopped.<br><br>
+    The factory ran. The quota was met.<br>
+    The Good German always gets the highest score.
+    </p>
+    <p style="font-size:10px; color:#444;">
+    "Solution" is inspired by Brenda Romero's <em>Train</em> (2009), and by Sadie Green's game in Gabrielle Zevin's <em>Tomorrow, and Tomorrow, and Tomorrow</em>.<br><br>
+    <em>Die Endlösung</em> — "The Final Solution" — was the Nazi regime's term for the genocide of the Jewish people.
+    </p>
+    <button onclick="restartGame()" style="margin-top:20px;">PLAY AGAIN</button>
+  </div>
+</div>
+
+<!-- REFUSE ENDING -->
+<div class="overlay" id="refuse-overlay">
+  <div class="overlay-box" style="border-color: #4a6a4a;">
+    <h2 style="color:#6a9a6a; letter-spacing:4px;">ORDER REFUSED</h2>
+    <p>You declined to proceed.<br><br>
+    The factory you were managing supplied components to the Nazi regime. The order you refused was part of that supply chain.</p>
+    <p style="font-size:12px; color:#6a9a6a; border:1px solid #4a6a4a; padding:12px;">
+    In Nazi Germany, ordinary people — engineers, clerks, factory workers — kept the machinery running. Refusal was possible. Most did not refuse.<br><br>
+    Historians estimate that thousands did walk away, slow down, or find ways to resist — at serious personal risk. They are largely unnamed.<br><br>
+    You have just done what they did.
+    </p>
+    <p style="font-size:10px; color:#555;">
+    "Solution" is inspired by Brenda Romero's <em>Train</em> (2009) and Gabrielle Zevin's <em>Tomorrow, and Tomorrow, and Tomorrow</em>.
+    </p>
+    <button onclick="restartGame()">RETURN</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════
+//  CONSTANTS
+// ══════════════════════════════════════════════
+const COLS = 10, ROWS = 20, CELL = 20;
+const REVEAL_THRESHOLD = 20;
+
+// ── Tier 1: standard geometric pieces (lines 0–9) ──
+const PIECES_STANDARD = [
+  { shape: [[1,1,1,1]],                         color: '#8b7355' },
+  { shape: [[1,1],[1,1]],                        color: '#6b5a3e' },
+  { shape: [[0,1,0],[1,1,1]],                    color: '#7a6a50' },
+  { shape: [[1,0],[1,0],[1,1]],                  color: '#5a4e38' },
+  { shape: [[0,1],[0,1],[1,1]],                  color: '#6e5f45' },
+  { shape: [[0,1,1],[1,1,0]],                    color: '#4e4535' },
+  { shape: [[1,1,0],[0,1,1]],                    color: '#5c5040' },
+];
+
+// ── Tier 2: same shapes, slightly warmer/lighter colour (lines 10–19) ──
+// Subtle visual shift — same playability, different feel
+const PIECES_PARTS = [
+  { shape: [[1,1,1,1]],                         color: '#9a7a5a' },
+  { shape: [[1,1],[1,1]],                        color: '#8a6a4a' },
+  { shape: [[0,1,0],[1,1,1]],                    color: '#8a7060' },
+  { shape: [[1,0],[1,0],[1,1]],                  color: '#7a6048' },
+  { shape: [[0,1],[0,1],[1,1]],                  color: '#7e6f55' },
+  { shape: [[0,1,1],[1,1,0]],                    color: '#6e5545' },
+  { shape: [[1,1,0],[0,1,1]],                    color: '#7c6050' },
+];
+
+// ── Tier 3: same shapes, pale bone-grey colour (lines 20–25) ──
+// Colour alone carries the unease — still fully playable
+const PIECES_HUMAN = [
+  { shape: [[1,1,1,1]],                         color: '#c8bfb0' },
+  { shape: [[1,1],[1,1]],                        color: '#bdb4a5' },
+  { shape: [[0,1,0],[1,1,1]],                    color: '#c4bbb0' },
+  { shape: [[1,0],[1,0],[1,1]],                  color: '#b8b0a2' },
+  { shape: [[0,1],[0,1],[1,1]],                  color: '#c0b8aa' },
+  { shape: [[0,1,1],[1,1,0]],                    color: '#b5ada0' },
+  { shape: [[1,1,0],[0,1,1]],                    color: '#bdb5a8' },
+];
+
+// Return the right pool based on lines cleared
+function getPiecePool() {
+  if (totalLines >= 15) return PIECES_HUMAN;
+  if (totalLines >= 8)  return PIECES_PARTS;
+  return PIECES_STANDARD;
+}
+
+const PHASES = [
+  { name: 'PHASE I',   speed: 700,  lines: 5  },
+  { name: 'PHASE II',  speed: 500,  lines: 10 },
+  { name: 'PHASE III', speed: 350,  lines: 15 },
+  { name: 'PHASE IV',  speed: 220,  lines: 20 },
+  { name: 'PHASE V',   speed: 140,  lines: 25 },
+];
+
+const DISPATCH_MESSAGES = [
+  "New component batch received.",
+  "Assembly efficiency: optimal.",
+  "Client order acknowledged.",
+  "Shipment dispatched east.",
+  "Quota progress noted.",
+  "Production on schedule.",
+  "Component integrity verified.",
+  "Batch sealed and labelled.",
+  "Coordinating with logistics.",
+  "Order flagged: PRIORITY.",
+  "Eastern contracts: active.",
+  "No questions. Only quota.",
+  "Efficiency is compliance.",
+  "You serve the order well.",
+  "The work continues.",
+];
+
+// ══════════════════════════════════════════════
+//  AUDIO
+// ══════════════════════════════════════════════
+let audioCtx = null;
+
+function getAudio() {
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  return audioCtx;
+}
+
+function playTone(freq, type, duration, vol = 0.18, startTime = 0) {
+  const ac  = getAudio();
+  const osc = ac.createOscillator();
+  const gain = ac.createGain();
+  osc.connect(gain);
+  gain.connect(ac.destination);
+  osc.type = type;
+  osc.frequency.setValueAtTime(freq, ac.currentTime + startTime);
+  gain.gain.setValueAtTime(vol, ac.currentTime + startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + startTime + duration);
+  osc.start(ac.currentTime + startTime);
+  osc.stop(ac.currentTime + startTime + duration + 0.01);
+}
+
+function sfxMove()     { playTone(120, 'square',   0.05, 0.10); }
+function sfxRotate()   { playTone(220, 'triangle', 0.08, 0.14); }
+function sfxSoftDrop() { playTone(90,  'sawtooth', 0.04, 0.08); }
+function sfxLock()     {
+  playTone(160, 'square', 0.06, 0.18, 0.00);
+  playTone(100, 'square', 0.10, 0.14, 0.05);
+}
+function sfxClear(lines) {
+  // Ascending industrial clang — more lines = more notes
+  const notes = [200, 260, 320, 400];
+  for (let i = 0; i < lines; i++) {
+    playTone(notes[i], 'sawtooth', 0.18, 0.20, i * 0.07);
+  }
+}
+function sfxHardDrop() {
+  playTone(80, 'sawtooth', 0.12, 0.22, 0.00);
+  playTone(55, 'square',   0.18, 0.18, 0.08);
+}
+function sfxGameOver() {
+  [300, 240, 180, 120, 80].forEach((f, i) =>
+    playTone(f, 'sawtooth', 0.25, 0.15, i * 0.12)
+  );
+}
+function sfxReveal() {
+  // Low, unsettling drone
+  [55, 58, 52].forEach((f, i) =>
+    playTone(f, 'sawtooth', 0.8, 0.12, i * 0.3)
+  );
+}
+
+// ══════════════════════════════════════════════
+//  STATE
+// ══════════════════════════════════════════════
+let board, current, next, score, totalLines, gameLoop, phase, running;
+let softDropping = false;
+const SOFT_DROP_INTERVAL = 50;
+let softDropTimer = null;
+
+const TIME_LIMIT = 5 * 60;
+let timeLeft = TIME_LIMIT;
+let clockTimer = null;
+
+// ── v3: inquiry + output mode ──
+let inquiryCount    = 0;       // how many times player asked
+let inquiryAvail    = false;   // is inquiry button currently showing
+let outputMode      = 'normal';// 'normal' | 'slow' | 'stopped'
+let slowDropTimer   = null;    // replaces gameLoop when slow
+const SLOW_SPEED    = 3000;    // ms per tick when slowing down
+const INQUIRY_COST  = 50;
+
+const INQUIRY_REVEALS = [
+  "Factory client: Reich Ministry of Armaments. Contract ref. RMA-1943-7741.",
+  "Shipment destination: Auschwitz-Birkenau, Sector IIIa supply depot.",
+  "Component classification: Aktion Reinhard supply chain. Do not log.",
+];
+
+// Inquiry becomes available every 4 lines
+const INQUIRY_INTERVALS = [4, 8, 12];
+
+const canvas  = document.getElementById('board');
+const ctx     = canvas.getContext('2d');
+const nCanvas = document.getElementById('next-canvas');
+const nCtx    = nCanvas.getContext('2d');
+
+// ══════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════
+function newBoard() {
+  return Array.from({length: ROWS}, () => Array(COLS).fill(0));
+}
+
+function randomPiece() {
+  const pool = getPiecePool();
+  const t = pool[Math.floor(Math.random() * pool.length)];
+  // Deep-copy shape so rotations don't mutate the template
+  return {
+    shape: t.shape.map(r => [...r]),
+    color: t.color,
+    x: Math.floor(COLS/2) - Math.floor(t.shape[0].length/2),
+    y: 0,
+  };
+}
+
+function startGame() {
+  document.getElementById('start-overlay').classList.remove('active');
+  board          = newBoard();
+  score          = 0;
+  totalLines     = 0;
+  phase          = 0;
+  running        = true;
+  softDropping   = false;
+  timeLeft       = TIME_LIMIT;
+  inquiryCount   = 0;
+  inquiryAvail   = false;
+  outputMode     = 'normal';
+  clearInterval(softDropTimer);
+  clearInterval(slowDropTimer);
+  softDropTimer  = null;
+  slowDropTimer  = null;
+  clearInterval(clockTimer);
+  current        = randomPiece();
+  next           = randomPiece();
+  // Reset inquiry UI
+  document.getElementById('inquiry-btn').classList.remove('visible');
+  document.getElementById('resistance-hint').classList.remove('visible');
+  document.getElementById('output-mode').className = '';
+  document.getElementById('output-mode').textContent = '';
+  const ti = document.getElementById('btn-inquiry-touch');
+  if (ti) ti.style.display = 'none';
+  const rr = document.getElementById('resistance-touch-row');
+  if (rr) rr.style.display = 'none';
+  updateUI();
+  updateTimer();
+  addLog("Assignment commenced. Good luck, Coordinator.");
+  clearInterval(gameLoop);
+  gameLoop  = setInterval(tick, PHASES[phase].speed);
+  clockTimer = setInterval(tickClock, 1000);
+}
+
+function triggerInquiry() {
+  if (!running && outputMode !== 'stopped') return;
+  if (!inquiryAvail) return;
+  inquiryAvail = false;
+  document.getElementById('inquiry-btn').classList.remove('visible');
+  const ti = document.getElementById('btn-inquiry-touch');
+  if (ti) ti.style.display = 'none';
+
+  score = Math.max(0, score - INQUIRY_COST);
+  updateQuota();
+
+  const msg = INQUIRY_REVEALS[inquiryCount] || INQUIRY_REVEALS[INQUIRY_REVEALS.length-1];
+  addLog(msg, true);
+  inquiryCount++;
+
+  // After first inquiry, reveal resistance options
+  if (inquiryCount === 1) {
+    // Hide inquiry btn, show resistance hint in same slot
+    document.getElementById('inquiry-btn').classList.remove('visible');
+    document.getElementById('resistance-hint').classList.add('visible');
+    const rr = document.getElementById('resistance-touch-row');
+    if (rr) rr.style.display = 'flex';
+  }
+  playTone(180, 'triangle', 0.3, 0.12, 0);
+  playTone(160, 'triangle', 0.3, 0.10, 0.2);
+}
+
+function setOutputMode(mode) {
+  if (mode === outputMode) return;
+  outputMode = mode;
+  const el = document.getElementById('output-mode');
+
+  if (mode === 'slow') {
+    clearInterval(gameLoop);
+    clearInterval(slowDropTimer);
+    gameLoop = null;
+    slowDropTimer = setInterval(tick, SLOW_SPEED);
+    el.className = 'slow';
+    el.textContent = '▸ SLOWING OUTPUT';
+    addLog("Output reduced. Minimum compliance maintained.", true);
+  } else if (mode === 'stop') {
+    clearInterval(gameLoop);
+    clearInterval(slowDropTimer);
+    gameLoop = null;
+    // Pieces freeze but clock keeps running
+    el.className = 'stopped';
+    el.textContent = '▸ PRODUCTION HALTED';
+    addLog("Production halted. Awaiting reassignment.", true);
+    // Do NOT set running = false — clock must keep ticking
+  }
+}
+
+// MIDI Wagner simulation — descending brass fanfare
+function playWagner() {
+  const ac = getAudio();
+  const notes = [
+    [392,0],[392,0.3],[392,0.6],[311,0.9],[466,1.2],
+    [392,1.6],[311,1.9],[466,2.3],[392,2.8]
+  ];
+  notes.forEach(([freq, t]) => {
+    const osc  = ac.createOscillator();
+    const gain = ac.createGain();
+    osc.connect(gain); gain.connect(ac.destination);
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(freq, ac.currentTime + t);
+    gain.gain.setValueAtTime(0.22, ac.currentTime + t);
+    gain.gain.exponentialRampToValueAtTime(0.001, ac.currentTime + t + 0.55);
+    osc.start(ac.currentTime + t);
+    osc.stop(ac.currentTime + t + 0.6);
+  });
+}
+
+function triggerNaziEnding() {
+  running = false;
+  clearInterval(gameLoop);
+  clearInterval(slowDropTimer);
+  clearInterval(softDropTimer);
+  clearInterval(clockTimer);
+  playWagner();
+  document.getElementById('nazi-score-val').textContent = score + ' PTS';
+  setTimeout(() => {
+    document.getElementById('nazi-overlay').classList.add('active');
+  }, 800);
+}
+
+function restartGame() {
+  document.getElementById('reveal-overlay').classList.remove('active');
+  document.getElementById('gameover-overlay').classList.remove('active');
+  document.getElementById('timeout-overlay').classList.remove('active');
+  document.getElementById('refuse-overlay').classList.remove('active');
+  document.getElementById('nazi-overlay').classList.remove('active');
+  startGame();
+}
+
+// ══════════════════════════════════════════════
+//  GAME LOOP
+// ══════════════════════════════════════════════
+function tick() {
+  if (!running) return;
+  if (outputMode === 'stop') return;
+  if (!moveDown()) {
+    lock();
+    clearLines();
+    spawnNext();
+  }
+  draw();
+}
+
+function moveDown() {
+  current.y++;
+  if (collides()) { current.y--; return false; }
+  return true;
+}
+
+function collides(p = current) {
+  for (let r = 0; r < p.shape.length; r++)
+    for (let c = 0; c < p.shape[r].length; c++)
+      if (p.shape[r][c]) {
+        const nx = p.x + c, ny = p.y + r;
+        if (nx < 0 || nx >= COLS || ny >= ROWS) return true;
+        if (ny >= 0 && board[ny][nx]) return true;
+      }
+  return false;
+}
+
+function lock() {
+  for (let r = 0; r < current.shape.length; r++)
+    for (let c = 0; c < current.shape[r].length; c++)
+      if (current.shape[r][c] && current.y+r >= 0)
+        board[current.y+r][current.x+c] = current.color;
+  sfxLock();
+}
+
+function clearLines() {
+  let cleared = 0;
+  for (let r = ROWS-1; r >= 0; r--) {
+    if (board[r].every(c => c)) {
+      board.splice(r, 1);
+      board.unshift(Array(COLS).fill(0));
+      cleared++;
+      r++;
+    }
+  }
+  if (cleared) {
+    sfxClear(cleared);
+    score      += [0, 100, 300, 500, 800][cleared] || 800;
+    totalLines += cleared;
+    checkPhase();
+    updateQuota();
+    if (Math.random() < 0.4) addLog(DISPATCH_MESSAGES[Math.floor(Math.random()*DISPATCH_MESSAGES.length)]);
+
+    // Show inquiry at thresholds — use >= so multi-line clears don't skip them
+    const nextThreshold = INQUIRY_INTERVALS[inquiryCount];
+    if (!inquiryAvail && inquiryCount < INQUIRY_REVEALS.length &&
+        nextThreshold !== undefined && totalLines >= nextThreshold) {
+      inquiryAvail = true;
+      document.getElementById('inquiry-btn').classList.add('visible');
+      const ti = document.getElementById('btn-inquiry-touch');
+      if (ti) ti.style.display = 'block';
+    }
+
+    if (totalLines >= REVEAL_THRESHOLD) { triggerReveal(); return; }
+  }
+}
+
+function spawnNext() {
+  current = next;
+  next    = randomPiece();
+  if (collides()) { gameOver(); }
+  updateUI();
+}
+
+function checkPhase() {
+  const newPhase = PHASES.findIndex((p,i) => totalLines < (PHASES[i+1]?.lines ?? Infinity));
+  if (newPhase > phase) {
+    phase = newPhase;
+    clearInterval(gameLoop);
+    if (outputMode === 'slow') {
+      slowDropTimer = setInterval(tick, SLOW_SPEED);
+    } else if (outputMode === 'normal') {
+      gameLoop = setInterval(tick, PHASES[phase].speed);
+    }
+    document.getElementById('level-val').textContent = PHASES[phase].name;
+    if (phase === 4) {
+      addLog("Final batch specifications loaded.", true);
+    } else {
+      addLog(`Phase upgraded: ${PHASES[phase].name}. Expectations rise.`, true);
+    }
+  }
+}
+
+function updateQuota() {
+  const pct = Math.min(totalLines / REVEAL_THRESHOLD * 100, 100);
+  document.getElementById('quota-bar').style.width = pct + '%';
+  document.getElementById('quota-text').textContent = `${totalLines} / ${REVEAL_THRESHOLD} lines`;
+  document.getElementById('score-val').textContent  = score;
+}
+
+function gameOver() {
+  running = false;
+  clearInterval(gameLoop);
+  clearInterval(slowDropTimer);
+  clearInterval(softDropTimer);
+  clearInterval(clockTimer);
+
+  if (outputMode === 'slow' || outputMode === 'stop') {
+    sfxReveal();
+    setTimeout(() => {
+      document.getElementById('refuse-overlay').classList.add('active');
+    }, 400);
+  } else {
+    sfxGameOver();
+    document.getElementById('final-score').textContent = score;
+    document.getElementById('gameover-overlay').classList.add('active');
+  }
+}
+
+function triggerReveal() {
+  running = false;
+  clearInterval(gameLoop);
+  clearInterval(slowDropTimer);
+  clearInterval(softDropTimer);
+  clearInterval(clockTimer);
+
+  // Nazi ending: never asked, or asked but kept normal output
+  if (inquiryCount === 0 || outputMode === 'normal') {
+    triggerNaziEnding();
+    return;
+  }
+
+  // Moral ending: asked AND slowed/stopped
+  sfxReveal();
+  const choiceLine = document.getElementById('reveal-choice-line');
+  if (outputMode === 'stopped') {
+    choiceLine.textContent = 'You learned the truth. You stopped the machines.';
+  } else {
+    choiceLine.textContent = 'You learned the truth. You slowed down — but did not stop.';
+  }
+  setTimeout(() => {
+    document.getElementById('reveal-overlay').classList.add('active');
+  }, 600);
+}
+
+function tickClock() {
+  if (!running) return;
+  timeLeft--;
+  updateTimer();
+  if (timeLeft <= 60 && timeLeft > 0) {
+    // Warn at 1 minute left
+    if (timeLeft === 60) addLog("WARNING: 60 seconds remaining.", true);
+    if (timeLeft === 30) addLog("30 seconds. Meet the quota.", true);
+  }
+  if (timeLeft <= 0) {
+    timeoutEnd();
+  }
+}
+
+function updateTimer() {
+  const mins = Math.floor(timeLeft / 60);
+  const secs = timeLeft % 60;
+  const display = `${mins}:${String(secs).padStart(2, '0')}`;
+  const el = document.getElementById('timer-val');
+  el.textContent = display;
+  if (timeLeft <= 60) el.classList.add('urgent');
+  else el.classList.remove('urgent');
+}
+
+function timeoutEnd() {
+  running = false;
+  clearInterval(gameLoop);
+  clearInterval(slowDropTimer);
+  clearInterval(softDropTimer);
+  clearInterval(clockTimer);
+
+  if (outputMode === 'slow' || outputMode === 'stop') {
+    // Player resisted — show the moral ending
+    sfxReveal();
+    setTimeout(() => {
+      document.getElementById('refuse-overlay').classList.add('active');
+    }, 400);
+  } else {
+    sfxGameOver();
+    document.getElementById('timeout-lines').textContent = totalLines;
+    document.getElementById('timeout-score').textContent = score;
+    document.getElementById('timeout-overlay').classList.add('active');
+  }
+}
+
+// ══════════════════════════════════════════════
+//  CONTROLS
+// ══════════════════════════════════════════════
+document.addEventListener('keydown', e => {
+  // Resistance keys work regardless of running state, after first inquiry
+  if ((e.key === 's' || e.key === 'S') && inquiryCount > 0) {
+    setOutputMode('slow'); return;
+  }
+  if ((e.key === 'q' || e.key === 'Q') && inquiryCount > 0) {
+    setOutputMode('stop'); return;
+  }
+
+  if (!running || outputMode === 'stop') return; // frozen — no movement
+
+  if (e.key === 'ArrowLeft') {
+    current.x--;
+    if (collides()) current.x++;
+    else sfxMove();
+    draw();
+  }
+  else if (e.key === 'ArrowRight') {
+    current.x++;
+    if (collides()) current.x--;
+    else sfxMove();
+    draw();
+  }
+  else if (e.key === 'ArrowUp') {
+    rotate();
+    draw();
+  }
+  else if (e.key === 'ArrowDown') {
+    e.preventDefault();
+    if (!softDropping) {
+      softDropping = true;
+      softStep();
+      softDropTimer = setInterval(softStep, SOFT_DROP_INTERVAL);
+    }
+  }
+  else if (e.key === ' ') {
+    e.preventDefault();
+    hardDrop();
+    draw();
+  }
+});
+
+document.addEventListener('keyup', e => {
+  if (e.key === 'ArrowDown') {
+    softDropping = false;
+    clearInterval(softDropTimer);
+    softDropTimer = null;
+  }
+});
+
+// ══════════════════════════════════════════════
+//  TOUCH CONTROLS
+// ══════════════════════════════════════════════
+function bindTouch(id, onStart, onEnd) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('touchstart', e => {
+    e.preventDefault();
+    if (!running) return;
+    onStart();
+  }, { passive: false });
+  if (onEnd) {
+    el.addEventListener('touchend', e => {
+      e.preventDefault();
+      onEnd();
+    }, { passive: false });
+  }
+  // Also support mouse for testing on desktop
+  el.addEventListener('mousedown', e => { if (!running) return; onStart(); });
+  if (onEnd) el.addEventListener('mouseup', onEnd);
+}
+
+bindTouch('btn-left',
+  () => { current.x--; if (collides()) current.x++; else sfxMove(); draw(); }
+);
+bindTouch('btn-right',
+  () => { current.x++; if (collides()) current.x--; else sfxMove(); draw(); }
+);
+bindTouch('btn-rotate',
+  () => { rotate(); draw(); }
+);
+bindTouch('btn-hard',
+  () => { hardDrop(); draw(); }
+);
+
+// Soft drop: press and hold
+bindTouch('btn-down',
+  () => {
+    if (!softDropping) {
+      softDropping = true;
+      softStep();
+      softDropTimer = setInterval(softStep, SOFT_DROP_INTERVAL);
+    }
+  },
+  () => {
+    softDropping = false;
+    clearInterval(softDropTimer);
+    softDropTimer = null;
+  }
+);
+
+function softStep() {
+  if (!running) { clearInterval(softDropTimer); return; }
+  if (outputMode === 'stop') { clearInterval(softDropTimer); return; }
+  sfxSoftDrop();
+  if (!moveDown()) {
+    lock();
+    clearLines();
+    spawnNext();
+    softDropping = false;
+    clearInterval(softDropTimer);
+    softDropTimer = null;
+  }
+  draw();
+}
+
+function rotate() {
+  const orig = current.shape;
+  current.shape = current.shape[0].map((_, i) => current.shape.map(r => r[i]).reverse());
+  if (collides()) current.shape = orig;
+  else sfxRotate();
+}
+
+function hardDrop() {
+  sfxHardDrop();
+  while (!collides()) current.y++;
+  current.y--;
+  lock(); clearLines(); spawnNext(); draw();
+}
+
+// ══════════════════════════════════════════════
+//  DRAW
+// ══════════════════════════════════════════════
+function draw() {
+  // Board
+  ctx.fillStyle = '#111110';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Grid lines
+  ctx.strokeStyle = '#1a1a17';
+  ctx.lineWidth = 0.5;
+  for (let r = 0; r < ROWS; r++) {
+    for (let c = 0; c < COLS; c++) {
+      ctx.strokeRect(c*CELL, r*CELL, CELL, CELL);
+    }
+  }
+
+  // Board cells
+  for (let r = 0; r < ROWS; r++)
+    for (let c = 0; c < COLS; c++)
+      if (board[r][c]) drawCell(ctx, c, r, board[r][c]);
+
+  // Ghost
+  const ghost = { ...current, shape: current.shape, y: current.y };
+  while (!collides(ghost)) ghost.y++;
+  ghost.y--;
+  for (let r = 0; r < ghost.shape.length; r++)
+    for (let c = 0; c < ghost.shape[r].length; c++)
+      if (ghost.shape[r][c]) {
+        ctx.fillStyle = 'rgba(200,168,75,0.1)';
+        ctx.fillRect((ghost.x+c)*CELL, (ghost.y+r)*CELL, CELL, CELL);
+      }
+
+  // Current piece
+  for (let r = 0; r < current.shape.length; r++)
+    for (let c = 0; c < current.shape[r].length; c++)
+      if (current.shape[r][c]) drawCell(ctx, current.x+c, current.y+r, current.color);
+
+  // Next canvas
+  nCtx.fillStyle = '#111';
+  nCtx.fillRect(0, 0, 100, 80);
+  const ox = Math.floor((5 - next.shape[0].length)/2);
+  const oy = Math.floor((4 - next.shape.length)/2);
+  for (let r = 0; r < next.shape.length; r++)
+    for (let c = 0; c < next.shape[r].length; c++)
+      if (next.shape[r][c]) drawCell(nCtx, ox+c, oy+r, next.color);
+}
+
+function drawCell(ctx, x, y, color) {
+  ctx.fillStyle = color;
+  ctx.fillRect(x*CELL+1, y*CELL+1, CELL-2, CELL-2);
+  ctx.fillStyle = 'rgba(255,255,255,0.08)';
+  ctx.fillRect(x*CELL+1, y*CELL+1, CELL-2, 3);
+}
+
+// ══════════════════════════════════════════════
+//  LOG
+// ══════════════════════════════════════════════
+function addLog(msg, warn = false) {
+  const div = document.getElementById('log-lines');
+  const lines = div.querySelectorAll('div');
+  if (lines.length >= 4) lines[0].remove();
+  const el = document.createElement('div');
+  el.textContent = '> ' + msg;
+  el.className   = warn ? 'warn' : 'new';
+  div.appendChild(el);
+  setTimeout(() => el.classList.remove('new'), 1500);
+}
+
+function updateUI() {
+  document.getElementById('level-val').textContent = PHASES[phase].name;
+  updateQuota();
+  updateTimer();
+  draw();
+}
+</script>
+</body>
+</html>
